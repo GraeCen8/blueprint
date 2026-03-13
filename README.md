@@ -35,7 +35,7 @@ when setting up a new project, you can use blueprint to:
 
 #### socials
 
-github: [https://github.com/graecen/blueprint](https://github.com/graecen/blueprint)
+github: [https://github.com/graecen8/blueprint](https://github.com/graecen/blueprint)
 email: <graecen8@gmail.com>
 
 **thanks for using blueprint!**
