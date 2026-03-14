@@ -191,6 +191,9 @@ func rewriteTemplatePath(target string) string {
 	case "go.sum.txt":
 		return filepath.Join(filepath.Dir(target), "go.sum")
 	default:
+		if strings.HasSuffix(target, ".go.txt") {
+			return strings.TrimSuffix(target, ".txt")
+		}
 		return target
 	}
 }
