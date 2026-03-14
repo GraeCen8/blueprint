@@ -1,0 +1,5 @@
+{
+  "name": "go-chi-rest-simple",
+  "language": "go",
+  "description": "Minimal Go REST API using chi."
+}
