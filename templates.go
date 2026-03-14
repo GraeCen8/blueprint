@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"embed"
 	"errors"
 	"fmt"
@@ -18,6 +19,12 @@ var printsFS embed.FS
 
 type TemplateStore struct {
 	fs fs.FS
+}
+
+type TemplateInfo struct {
+	Name        string `json:"name"`
+	Language    string `json:"language"`
+	Description string `json:"description"`
 }
 
 func NewTemplateStore() *TemplateStore {
@@ -55,6 +62,32 @@ func (t *TemplateStore) Has(name string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func (t *TemplateStore) Templates() ([]TemplateInfo, error) {
+	names, err := t.List()
+	if err != nil {
+		return nil, err
+	}
+
+	templates := make([]TemplateInfo, 0, len(names))
+	for _, name := range names {
+		info := TemplateInfo{Name: name}
+		metaPath := path.Join("prints", name, "template.json")
+		if data, err := fs.ReadFile(t.fs, metaPath); err == nil {
+			var parsed TemplateInfo
+			if err := json.Unmarshal(data, &parsed); err == nil {
+				if parsed.Name != "" {
+					info.Name = parsed.Name
+				}
+				info.Language = parsed.Language
+				info.Description = parsed.Description
+			}
+		}
+		templates = append(templates, info)
+	}
+
+	return templates, nil
 }
 
 func (t *TemplateStore) Extract(name, dest string) error {
