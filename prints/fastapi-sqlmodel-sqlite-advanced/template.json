@@ -1,0 +1,5 @@
+{
+  "name": "fastapi-sqlmodel-sqlite-advanced",
+  "language": "python",
+  "description": "FastAPI + SQLModel + SQLite with routers and CRUD helpers."
+}
