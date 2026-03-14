@@ -1,0 +1,5 @@
+{
+  "name": "ratatui-basic",
+  "language": "rust",
+  "description": "Minimal Rust TUI using ratatui and crossterm."
+}
