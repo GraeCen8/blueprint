@@ -1,0 +1,5 @@
+{
+  "name": "bubble-tea-basic",
+  "language": "go",
+  "description": "Minimal Bubble Tea TUI in Go."
+}
