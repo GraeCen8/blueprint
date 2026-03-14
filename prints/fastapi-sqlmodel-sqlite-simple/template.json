@@ -1,0 +1,5 @@
+{
+  "name": "fastapi-sqlmodel-sqlite-simple",
+  "language": "python",
+  "description": "Minimal FastAPI + SQLModel + SQLite project."
+}
