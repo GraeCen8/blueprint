@@ -58,7 +58,6 @@ func (m *Model) updateWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return stepGitConfirm, true
 		})
 	case stepGitConfirm:
-		m.ensureOptions([]string{"yes", "no"})
 		return m.updateWizardOptions(msg, func(choice string) (WizardStep, bool, tea.Cmd) {
 			m.wizard.gitEnabled = choice == "yes"
 			if m.wizard.gitEnabled {
@@ -87,19 +86,16 @@ func (m *Model) updateWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return stepLanguage, true
 		})
 	case stepLanguage:
-		m.ensureOptions(m.languageOptions())
 		return m.updateWizardOptions(msg, func(choice string) (WizardStep, bool, tea.Cmd) {
 			m.wizard.language = choice
 			return stepTemplate, true, nil
 		})
 	case stepTemplate:
-		m.ensureOptions(m.templateOptions(m.wizard.language))
 		return m.updateWizardOptions(msg, func(choice string) (WizardStep, bool, tea.Cmd) {
 			m.wizard.template = choice
 			return stepConfirm, true, nil
 		})
 	case stepConfirm:
-		m.ensureOptions([]string{"create", "cancel"})
 		return m.updateWizardOptions(msg, func(choice string) (WizardStep, bool, tea.Cmd) {
 			if choice == "cancel" {
 				m.wizard.active = false
