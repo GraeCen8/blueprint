@@ -110,7 +110,7 @@ func (t *TemplateStore) Extract(name, dest string) error {
 
 		rel := strings.TrimPrefix(p, root)
 		rel = strings.TrimPrefix(rel, "/")
-		target := filepath.Join(dest, filepath.FromSlash(rel))
+		target := rewriteTemplatePath(filepath.Join(dest, filepath.FromSlash(rel)))
 
 		if d.IsDir() {
 			return os.MkdirAll(target, 0o755)
@@ -182,4 +182,15 @@ func ensureDirReady(dir string) error {
 	}
 
 	return nil
+}
+
+func rewriteTemplatePath(target string) string {
+	switch filepath.Base(target) {
+	case "go.mod.txt":
+		return filepath.Join(filepath.Dir(target), "go.mod")
+	case "go.sum.txt":
+		return filepath.Join(filepath.Dir(target), "go.sum")
+	default:
+		return target
+	}
 }
