@@ -39,3 +39,10 @@ github: [https://github.com/graecen8/blueprint](https://github.com/graecen/bluep
 email: <graecen8@gmail.com>
 
 **thanks for using blueprint!**
+
+### future plans
+
+* [ ] allow cloning a git repo
+* [ ] allow creating a new project from a current project
+* [ ] make a database for the projects to access later
+* [ ] make a menu for opening projects that have been made
