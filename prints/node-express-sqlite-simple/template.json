@@ -1,0 +1,5 @@
+{
+  "name": "node-express-sqlite-simple",
+  "language": "javascript",
+  "description": "Minimal Express + SQLite API."
+}
