@@ -1,12 +1,27 @@
 package main
 
 import (
+	"fmt"
+	"path/filepath"
 	"strings"
 
 	lipgloss "github.com/charmbracelet/lipgloss"
 )
 
 func (m Model) View() string {
+	sidebarWidth := m.width / 3
+	if sidebarWidth < 24 {
+		sidebarWidth = 24
+	}
+	if sidebarWidth > m.width-24 {
+		sidebarWidth = maxInt(18, m.width-24)
+	}
+	contentWidth := m.width - sidebarWidth
+	if contentWidth < 20 {
+		contentWidth = 20
+		sidebarWidth = maxInt(18, m.width-contentWidth)
+	}
+
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("#22d3ee")).
@@ -17,14 +32,14 @@ func (m Model) View() string {
 		BorderForeground(lipgloss.Color("#1a2332"))
 
 	sidebarStyle := lipgloss.NewStyle().
-		Width(m.width/3).
+		Width(sidebarWidth).
 		Height(m.height-3).
 		Padding(1).
 		Border(lipgloss.NormalBorder(), false, true, false, false).
 		BorderForeground(lipgloss.Color("#1a2332"))
 
 	contentStyle := lipgloss.NewStyle().
-		Width(m.width-24).
+		Width(contentWidth).
 		Height(m.height-3).
 		Padding(1, 2)
 
@@ -34,26 +49,159 @@ func (m Model) View() string {
 		Padding(0, 1)
 
 	header := headerStyle.Render("blueprint")
-	contentLines := []string{
-		"Press n to create a new project.",
-		"Press q to quit.",
-	}
-	if m.status != "" {
-		contentLines = append(contentLines, "", "Status: "+m.status)
-	}
-	if m.errMsg != "" {
-		contentLines = append(contentLines, "", "Error: "+m.errMsg)
-	}
-	content := contentStyle.Render(strings.Join(contentLines, "\n"))
-	footer := footerStyle.Render("↑/↓ navigate • enter select • n new project • q quit")
-	sidebar := sidebarStyle.Render(" ")
+	sidebar := sidebarStyle.Render(m.renderProjectList())
+	content := contentStyle.Render(m.renderProjectPreview(contentWidth, m.height-3))
+	footer := footerStyle.Render(m.footerText())
 	body := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, content)
 
 	text := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
 	if m.wizard.active {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.wizardView())
 	}
+	if m.confirmDelete {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.deleteConfirmView())
+	}
 	return text
+}
+
+func (m Model) renderProjectList() string {
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f8fafc"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#64748b"))
+	itemStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#cbd5f5"))
+	selectedStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#0f172a")).
+		Background(lipgloss.Color("#22d3ee")).
+		Bold(true).
+		Padding(0, 1)
+
+	lines := []string{
+		titleStyle.Render("Projects"),
+		mutedStyle.Render(fmt.Sprintf("%d total", len(m.projects))),
+		"",
+	}
+	if len(m.projects) == 0 {
+		lines = append(lines, mutedStyle.Render("No projects yet."))
+		lines = append(lines, mutedStyle.Render("Press n to create one."))
+		return lipgloss.JoinVertical(lipgloss.Left, lines...)
+	}
+
+	for i, project := range m.projects {
+		name := project.Name
+		if name == "" {
+			name = filepath.Base(project.Path)
+		}
+		if i == m.selected {
+			lines = append(lines, selectedStyle.Render(name))
+		} else {
+			lines = append(lines, itemStyle.Render(name))
+		}
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+func (m Model) renderProjectPreview(width, height int) string {
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f8fafc"))
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94a3b8"))
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#e2e8f0"))
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#64748b"))
+	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f87171"))
+
+	project, ok := m.selectedProject()
+	if !ok {
+		return mutedStyle.Render("No project selected.")
+	}
+
+	name := project.Name
+	if name == "" {
+		name = filepath.Base(project.Path)
+	}
+	path := project.Path
+	if strings.TrimSpace(path) == "" {
+		path = "unknown"
+	}
+
+	infoLines := []string{
+		titleStyle.Render("Project Overview"),
+		labelStyle.Render("Name: ") + valueStyle.Render(name),
+		labelStyle.Render("Path: ") + valueStyle.Render(path),
+		labelStyle.Render("Language: ") + valueStyle.Render(emptyFallback(project.Language, "unknown")),
+		labelStyle.Render("Template: ") + valueStyle.Render(emptyFallback(project.Template, "none")),
+		labelStyle.Render("Git: ") + valueStyle.Render(boolLabel(project.Git)),
+		labelStyle.Render("Created: ") + valueStyle.Render(project.CreatedAt.Format("2006-01-02 15:04")),
+	}
+	if project.Git && (project.GitUser != "" || project.GitRepo != "") {
+		repo := strings.Trim(project.GitUser+"/"+project.GitRepo, "/")
+		infoLines = append(infoLines, labelStyle.Render("Repo: ")+valueStyle.Render(repo))
+	}
+
+	treeHeader := titleStyle.Render("Project Tree")
+	treeBody := ""
+	switch {
+	case m.previewLoading:
+		treeBody = mutedStyle.Render("Loading project tree...")
+	case m.previewErr != "":
+		treeBody = errorStyle.Render(m.previewErr)
+		if strings.TrimSpace(m.previewOutput) != "" {
+			treeBody = lipgloss.JoinVertical(lipgloss.Left, treeBody, m.previewOutput)
+		}
+	default:
+		treeBody = m.previewOutput
+		if strings.TrimSpace(treeBody) == "" {
+			treeBody = mutedStyle.Render("No output yet.")
+		}
+	}
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		lipgloss.JoinVertical(lipgloss.Left, infoLines...),
+		"",
+		treeHeader,
+		treeBody,
+	)
+	return clipLines(content, height-1)
+}
+
+func (m Model) deleteConfirmView() string {
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#f87171")).
+		Padding(1, 2).
+		Width(64)
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#f8fafc"))
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#94a3b8"))
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#e2e8f0"))
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#fca5a5"))
+
+	project := m.deleteCandidate
+	name := project.Name
+	if name == "" {
+		name = filepath.Base(project.Path)
+	}
+	path := project.Path
+	if strings.TrimSpace(path) == "" {
+		path = "unknown"
+	}
+	lines := []string{
+		titleStyle.Render("Delete Project"),
+		warnStyle.Render("This will remove the project directory and its record."),
+		"",
+		labelStyle.Render("Name: ") + valueStyle.Render(name),
+		labelStyle.Render("Path: ") + valueStyle.Render(path),
+		"",
+		labelStyle.Render("Press y to confirm • n or esc to cancel"),
+	}
+	return boxStyle.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
+}
+
+func (m Model) footerText() string {
+	footer := "↑/↓ navigate • n new project • d delete • q quit"
+	if m.errMsg != "" {
+		return footer + " | error: " + m.errMsg
+	}
+	if m.status != "" {
+		return footer + " | " + m.status
+	}
+	return footer
 }
 
 func (m Model) wizardView() string {
@@ -143,4 +291,33 @@ func boolLabel(value bool) string {
 		return "yes"
 	}
 	return "no"
+}
+
+func emptyFallback(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
+func clipLines(content string, maxLines int) string {
+	if maxLines <= 0 {
+		return ""
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) <= maxLines {
+		return content
+	}
+	lines = lines[:maxLines]
+	if maxLines > 1 {
+		lines[maxLines-1] = "\x1b[0m..."
+	}
+	return strings.Join(lines, "\n")
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
