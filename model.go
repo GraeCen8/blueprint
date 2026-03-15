@@ -8,19 +8,32 @@ import (
 )
 
 type Model struct {
-	exit      bool
-	width     int
-	height    int
-	setup     *Setup
-	templates []TemplateInfo
-	status    string
-	errMsg    string
-	wizard    WizardState
+	exit            bool
+	width           int
+	height          int
+	setup           *Setup
+	store           *Store
+	templates       []TemplateInfo
+	projects        []Project
+	selected        int
+	previewOutput   string
+	previewErr      string
+	previewProject  uint
+	previewLoading  bool
+	confirmDelete   bool
+	deleteCandidate Project
+	status          string
+	errMsg          string
+	wizard          WizardState
 }
 
 func (m *Model) Init() tea.Cmd {
+	var cmds []tea.Cmd
 	if m.setup == nil {
 		m.setup = NewSetup()
+	}
+	if m.store == nil {
+		m.store = NewStore()
 	}
 
 	templates, err := m.setup.Templates.Templates()
@@ -30,10 +43,27 @@ func (m *Model) Init() tea.Cmd {
 		m.templates = templates
 	}
 
-	return nil
+	if err := m.store.Init(); err != nil {
+		m.errMsg = fmt.Sprintf("init store: %v", err)
+	} else if err := m.refreshProjects(); err != nil {
+		m.errMsg = fmt.Sprintf("load projects: %v", err)
+	}
+
+	if cmd := m.loadPreviewForSelected(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.exit {
+		return m, tea.Quit
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -42,7 +72,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.wizard.active {
 			return m.updateWizard(msg)
 		}
-		m.Key(msg.String())
+		if m.confirmDelete {
+			return m.updateDeleteConfirm(msg)
+		}
+		cmd := m.Key(msg.String())
+		return m, cmd
 	case setupResultMsg:
 		m.wizard.active = false
 		if msg.err != nil {
@@ -51,6 +85,40 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.errMsg = ""
 			m.status = "project created"
+			if err := m.addProject(msg.project); err != nil {
+				m.errMsg = err.Error()
+				m.status = ""
+			} else if cmd := m.loadPreviewForSelected(); cmd != nil {
+				return m, cmd
+			}
+		}
+	case projectTreeMsg:
+		if current, ok := m.selectedProject(); ok && current.ID == msg.projectID {
+			m.previewLoading = false
+			if msg.err != nil {
+				m.previewErr = msg.err.Error()
+				if msg.output != "" {
+					m.previewOutput = msg.output
+				} else {
+					m.previewOutput = ""
+				}
+			} else {
+				m.previewErr = ""
+				m.previewOutput = msg.output
+			}
+		}
+	case deleteResultMsg:
+		m.status = ""
+		if msg.err != nil {
+			m.errMsg = msg.err.Error()
+		} else {
+			m.errMsg = ""
+			m.status = "project deleted"
+			if err := m.refreshProjects(); err != nil {
+				m.errMsg = err.Error()
+			} else if cmd := m.loadPreviewForSelected(); cmd != nil {
+				return m, cmd
+			}
 		}
 	}
 
@@ -61,15 +129,35 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) Key(msg string) {
+func (m *Model) Key(msg string) tea.Cmd {
 	switch msg {
 	case "q", "esc":
 		m.exit = true // exit the program
-		return        // return from the function
+		return nil    // return from the function
 	case "n":
 		m.startWizard()
-		return
+		return nil
+	case "up", "k":
+		if m.selected > 0 {
+			m.selected--
+			return m.loadPreviewForSelected()
+		}
+		return nil
+	case "down", "j":
+		if m.selected < len(m.projects)-1 {
+			m.selected++
+			return m.loadPreviewForSelected()
+		}
+		return nil
+	case "d":
+		if project, ok := m.selectedProject(); ok {
+			m.confirmDelete = true
+			m.deleteCandidate = project
+		}
+		return nil
 	}
+
+	return nil
 }
 
 func (m *Model) startWizard() {

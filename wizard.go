@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -36,7 +37,8 @@ type WizardState struct {
 }
 
 type setupResultMsg struct {
-	err error
+	err     error
+	project Project
 }
 
 func (m *Model) updateWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -109,11 +111,20 @@ func (m *Model) updateWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				Template:   m.wizard.template,
 				Language:   ParseLanguage(m.wizard.language),
 			}
+			project := Project{
+				Name:     filepath.Base(m.wizard.projectDir),
+				Path:     m.wizard.projectDir,
+				Language: strings.ToLower(m.wizard.language),
+				Template: m.wizard.template,
+				Git:      m.wizard.gitEnabled,
+				GitUser:  m.wizard.gitUser,
+				GitRepo:  m.wizard.gitRepo,
+			}
 			m.wizard.active = false
 			m.status = "creating project..."
 			return stepConfirm, true, func() tea.Msg {
 				err := m.setup.Setup(opts)
-				return setupResultMsg{err: err}
+				return setupResultMsg{err: err, project: project}
 			}
 		})
 	}
