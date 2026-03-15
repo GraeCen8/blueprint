@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/glamour"
 	lipgloss "github.com/charmbracelet/lipgloss"
 )
 
@@ -105,6 +106,7 @@ func (m Model) renderProjectPreview(width, height int) string {
 	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#e2e8f0"))
 	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#64748b"))
 	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f87171"))
+	innerWidth := maxInt(10, width-4)
 
 	project, ok := m.selectedProject()
 	if !ok {
@@ -158,7 +160,55 @@ func (m Model) renderProjectPreview(width, height int) string {
 		treeHeader,
 		treeBody,
 	)
+	readme := strings.TrimSpace(m.previewReadme)
+	if readme != "" && shouldShowReadme(treeBody, innerWidth) {
+		readmeHeader := titleStyle.Render("README")
+		readmeBody := renderMarkdown(readme, innerWidth)
+		content = lipgloss.JoinVertical(
+			lipgloss.Left,
+			content,
+			"",
+			readmeHeader,
+			readmeBody,
+		)
+	}
 	return clipLines(content, height-1)
+}
+
+func shouldShowReadme(treeBody string, width int) bool {
+	if width <= 0 {
+		return false
+	}
+	return maxLineWidth(treeBody) <= width/2
+}
+
+func maxLineWidth(text string) int {
+	maxWidth := 0
+	for _, line := range strings.Split(text, "\n") {
+		lineWidth := lipgloss.Width(line)
+		if lineWidth > maxWidth {
+			maxWidth = lineWidth
+		}
+	}
+	return maxWidth
+}
+
+func renderMarkdown(source string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	renderer, err := glamour.NewTermRenderer(
+		glamour.WithWordWrap(width),
+		glamour.WithStandardStyle("dark"),
+	)
+	if err != nil {
+		return source
+	}
+	rendered, err := renderer.Render(source)
+	if err != nil {
+		return source
+	}
+	return strings.TrimRight(rendered, "\n")
 }
 
 func (m Model) deleteConfirmView() string {
