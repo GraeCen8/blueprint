@@ -161,7 +161,7 @@ func (m Model) renderProjectPreview(width, height int) string {
 		treeBody,
 	)
 	readme := strings.TrimSpace(m.previewReadme)
-	if readme != "" && shouldShowReadme(treeBody, innerWidth) {
+	if readme != "" && shouldShowReadme(treeBody, innerWidth, project.Path) {
 		readmeHeader := titleStyle.Render("README")
 		readmeBody := renderMarkdown(readme, innerWidth)
 		content = lipgloss.JoinVertical(
@@ -175,17 +175,30 @@ func (m Model) renderProjectPreview(width, height int) string {
 	return clipLines(content, height-1)
 }
 
-func shouldShowReadme(treeBody string, width int) bool {
+func shouldShowReadme(treeBody string, width int, projectPath string) bool {
 	if width <= 0 {
 		return false
 	}
-	return maxLineWidth(treeBody) <= width/2
+	return maxTreeLineWidth(treeBody, projectPath) <= width/2
 }
 
-func maxLineWidth(text string) int {
+func maxTreeLineWidth(text, projectPath string) int {
 	maxWidth := 0
-	for _, line := range strings.Split(text, "\n") {
-		lineWidth := lipgloss.Width(line)
+	lines := strings.Split(text, "\n")
+	rootName := filepath.Base(strings.TrimSpace(projectPath))
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if i == 0 {
+			// Ignore the root line; it often contains the full path.
+			continue
+		}
+		sanitized := line
+		if projectPath != "" {
+			sanitized = strings.ReplaceAll(sanitized, projectPath, rootName)
+		}
+		lineWidth := lipgloss.Width(sanitized)
 		if lineWidth > maxWidth {
 			maxWidth = lineWidth
 		}
