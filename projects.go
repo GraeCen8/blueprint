@@ -85,6 +85,7 @@ func loadProjectPreviewCmd(project Project) tea.Cmd {
 			"--icons",
 			"--git",
 			"--color=always",
+			"--",
 			project.Path,
 		)
 		cmd.Env = append(os.Environ(), "TERM=xterm-256color", "CLICOLOR=1")
@@ -111,8 +112,8 @@ func loadProjectReadme(projectPath string) (string, error) {
 	var readmePath string
 	for _, name := range readmeNames {
 		candidate := filepath.Join(projectPath, name)
-		info, err := os.Stat(candidate)
-		if err != nil || info.IsDir() {
+		info, err := os.Lstat(candidate)
+		if err != nil || info.IsDir() || (info.Mode()&os.ModeSymlink) != 0 {
 			continue
 		}
 		readmePath = candidate
