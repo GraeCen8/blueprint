@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,10 +12,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type projectTreeMsg struct {
-	projectID uint
-	output    string
-	err       error
+type projectPreviewMsg struct {
+	projectID  uint
+	treeOutput string
+	treeErr    error
+	readme     string
+	readmeErr  error
 }
 
 type deleteResultMsg struct {
@@ -32,6 +35,8 @@ func (m *Model) refreshProjects() error {
 		m.selected = 0
 		m.previewOutput = ""
 		m.previewErr = ""
+		m.previewReadme = ""
+		m.previewReadmeErr = ""
 		m.previewLoading = false
 		return nil
 	}
@@ -53,20 +58,24 @@ func (m *Model) loadPreviewForSelected() tea.Cmd {
 	if !ok {
 		m.previewOutput = ""
 		m.previewErr = ""
+		m.previewReadme = ""
+		m.previewReadmeErr = ""
 		m.previewLoading = false
 		return nil
 	}
 	m.previewErr = ""
 	m.previewOutput = ""
+	m.previewReadme = ""
+	m.previewReadmeErr = ""
 	m.previewLoading = true
 	m.previewProject = project.ID
-	return loadProjectTreeCmd(project)
+	return loadProjectPreviewCmd(project)
 }
 
-func loadProjectTreeCmd(project Project) tea.Cmd {
+func loadProjectPreviewCmd(project Project) tea.Cmd {
 	return func() tea.Msg {
 		if project.Path == "" {
-			return projectTreeMsg{projectID: project.ID, err: errors.New("project path is required")}
+			return projectPreviewMsg{projectID: project.ID, treeErr: errors.New("project path is required")}
 		}
 		cmd := exec.Command(
 			"eza",
@@ -76,16 +85,57 @@ func loadProjectTreeCmd(project Project) tea.Cmd {
 			"--icons",
 			"--git",
 			"--color=always",
+			"--",
 			project.Path,
 		)
 		cmd.Env = append(os.Environ(), "TERM=xterm-256color", "CLICOLOR=1")
 		output, err := cmd.CombinedOutput()
-		return projectTreeMsg{
-			projectID: project.ID,
-			output:    string(output),
-			err:       err,
+		readme, readmeErr := loadProjectReadme(project.Path)
+		return projectPreviewMsg{
+			projectID:  project.ID,
+			treeOutput: string(output),
+			treeErr:    err,
+			readme:     readme,
+			readmeErr:  readmeErr,
 		}
 	}
+}
+
+func loadProjectReadme(projectPath string) (string, error) {
+	readmeNames := []string{
+		"README.md",
+		"Readme.md",
+		"readme.md",
+		"README.txt",
+		"README",
+	}
+	var readmePath string
+	for _, name := range readmeNames {
+		candidate := filepath.Join(projectPath, name)
+		info, err := os.Lstat(candidate)
+		if err != nil || info.IsDir() || (info.Mode()&os.ModeSymlink) != 0 {
+			continue
+		}
+		readmePath = candidate
+		break
+	}
+	if readmePath == "" {
+		return "", nil
+	}
+
+	const maxReadmeBytes = 200 * 1024
+	file, err := os.Open(readmePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	limited := io.LimitReader(file, maxReadmeBytes)
+	content, err := io.ReadAll(limited)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
 }
 
 func (m *Model) addProject(project Project) error {

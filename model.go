@@ -8,23 +8,25 @@ import (
 )
 
 type Model struct {
-	exit            bool
-	width           int
-	height          int
-	setup           *Setup
-	store           *Store
-	templates       []TemplateInfo
-	projects        []Project
-	selected        int
-	previewOutput   string
-	previewErr      string
-	previewProject  uint
-	previewLoading  bool
-	confirmDelete   bool
-	deleteCandidate Project
-	status          string
-	errMsg          string
-	wizard          WizardState
+	exit             bool
+	width            int
+	height           int
+	setup            *Setup
+	store            *Store
+	templates        []TemplateInfo
+	projects         []Project
+	selected         int
+	previewOutput    string
+	previewErr       string
+	previewReadme    string
+	previewReadmeErr string
+	previewProject   uint
+	previewLoading   bool
+	confirmDelete    bool
+	deleteCandidate  Project
+	status           string
+	errMsg           string
+	wizard           WizardState
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -92,19 +94,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 		}
-	case projectTreeMsg:
+	case projectPreviewMsg:
 		if current, ok := m.selectedProject(); ok && current.ID == msg.projectID {
 			m.previewLoading = false
-			if msg.err != nil {
-				m.previewErr = msg.err.Error()
-				if msg.output != "" {
-					m.previewOutput = msg.output
+			if msg.treeErr != nil {
+				m.previewErr = msg.treeErr.Error()
+				if msg.treeOutput != "" {
+					m.previewOutput = msg.treeOutput
 				} else {
 					m.previewOutput = ""
 				}
 			} else {
 				m.previewErr = ""
-				m.previewOutput = msg.output
+				m.previewOutput = msg.treeOutput
+			}
+			if msg.readmeErr != nil {
+				m.previewReadme = ""
+				m.previewReadmeErr = msg.readmeErr.Error()
+			} else {
+				m.previewReadme = msg.readme
+				m.previewReadmeErr = ""
 			}
 		}
 	case deleteResultMsg:
