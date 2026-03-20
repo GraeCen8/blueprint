@@ -30,7 +30,7 @@ when setting up a new project, you can use blueprint to:
 
 > [!NOTE]
 > if you are using want to aid the development of blueprint,
-> you can commit to the project as you see fit. we openly
+> you can commit to the project as you see fit. I openly
 > encourage you to do so.
 
 #### socials
