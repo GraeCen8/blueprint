@@ -42,7 +42,7 @@ email: <graecen8@gmail.com>
 
 ### future plans
 
-* [x] allow cloning a git repo
-* [x] allow creating a new project from a current project
+* [ ] allow cloning a git repo
+* [ ] allow creating a new project from a current project
 * [x] make a database for the projects to access later
 * [x] make a menu for opening projects that have been made
