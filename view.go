@@ -226,7 +226,7 @@ func (m Model) deleteConfirmView() string {
 }
 
 func (m Model) footerText() string {
-	footer := "↑/↓ navigate • n new project • d delete • q quit"
+	footer := "↑/↓ navigate • n new project • d delete • q quit • e editor (nvim)"
 	if m.errMsg != "" {
 		return footer + " | error: " + m.errMsg
 	}

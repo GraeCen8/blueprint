@@ -129,6 +129,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 		}
+	case editorResultMsg:
+		m.status = ""
+		if msg.err != nil {
+			m.errMsg = fmt.Sprintf("open editor: %v", msg.err)
+		} else {
+			m.errMsg = ""
+		}
 	}
 
 	if m.exit {
@@ -164,6 +171,8 @@ func (m *Model) Key(msg string) tea.Cmd {
 			m.deleteCandidate = project
 		}
 		return nil
+	case "e":
+		return m.openEditor()
 	}
 
 	return nil
